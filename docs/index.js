@@ -52,7 +52,7 @@ async function scanAllElementsVerbose(page, label = "Scan") {
         classes: el.className
       }));
   });
-  elements.forEach(el => console.log(`#${el.index}`, el));
+   elements.forEach(el => console.log(`#${el.index}`, el));
   return elements;
 }
 
@@ -71,6 +71,10 @@ async function downloadMedia(url, filename) {
 
   return new Promise((resolve, reject) => {
     const request = https.get(url, options, (res) => {
+    console.log("🌐 GET:", url);
+    console.log("🔢 Status:", res.statusCode);
+    console.log("📎 Location:", res.headers.location || "(tidak ada)");
+      
       // 🔁 Handle redirect (301, 302)
       if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
         console.log("🔁 Redirect ke:", res.headers.location);
@@ -152,8 +156,8 @@ async function downloadMedia(url, filename) {
              return false; }
   
     // Upload file
-////  await fileInput.uploadFile(filePath);
- /// console.log(`✅ File ${fileName} berhasil di-upload ke input`);
+  await fileInput.uploadFile(filePath);
+  console.log(`✅ File ${fileName} berhasil di-upload ke input`);
     
     
 // ✅ Upload file ke input dan pastikan React detect File object asli
@@ -250,8 +254,8 @@ try {
   }
 
   // Tambah buffer agar Facebook encode selesai
-  await page.waitForTimeout(15000);
-  console.log("⏳ Tambahan waktu encode 15 detik selesai");
+  await page.waitForTimeout(3000);
+  console.log("⏳ Tambahan waktu encode 3 detik selesai");
 
 } catch (e) {
   console.log("⚠️ Preview tidak muncul dalam batas waktu, paksa lanjut...");
@@ -313,6 +317,9 @@ function delay(ms) {
     });
 
     const page = await browser.newPage();
+   
+    await page.setBypassCSP(true);
+                                           
      // 🔊 Monitor semua console dari browser
 page.on("console", msg => console.log("📢 [Browser]", msg.text()));
 page.on("pageerror", err => console.log("💥 [Browser Error]", err.message));
@@ -342,6 +349,10 @@ page.on("response", res => {
     await page.setCookie(...cookies);
     console.log("✅ Cookies set");
 
+    // Buka versi mobile Facebook
+  await page.goto("https://m.facebook.com/", { waitUntil: "networkidle2" });
+  console.log("✅ Berhasil buka Facebook (mobile)");
+    
     // ===== Buka grup
     await page.goto(groupUrl, { waitUntil: "networkidle2" });
     await page.waitForTimeout(3000);
@@ -402,11 +413,13 @@ console.log("FILL:", fillResult);
 
 
   // ===== 3️⃣ Download + upload media
- const today = process.env.DATE;
- const fileName = `akun1_${today}.png`; // bisa .mp4
-const mediaUrl ="https://github.com/Rulispro/Coba-post-group-Facebook-/releases/download/V1.0/Screenshot_20250909-071607.png";
-// download media → simpan return value ke filePat
-  const filePath = await downloadMedia(mediaUrl, fileName);
+ const today = process.env.DATE || new Date().toISOString().split("T")[0];
+ const fileName = 'akun1_${today}.png'; // bisa .mp4
+ const mediaUrl = 'https://github.com/Rulispro/Coba-post-group-Facebook-/releases/download/V1.0/Screenshot_20251013-115539.png';
+
+
+  // download media → simpan return value ke filePat
+const filePath = await downloadMedia(mediaUrl, fileName);
 console.log(`✅ Media ${fileName} berhasil di-download.`);
 
 const stats = fs.statSync(filePath);
@@ -430,8 +443,38 @@ await page.evaluate(() => {
 });
 console.log("✅ Klik POST berhasil (via innerText)");
 
-   await delay(3000); // kasih waktu 3 detik minimal
+  await delay(3000); // kasih waktu 3 detik minimal
+  await page.goto(groupUrl, { waitUntil: "networkidle2" });
+  console.log(" Mulai akan lakukan like postingan");
+    
+  let max = 10;        // jumlah like maksimal
+  let delayMs = 3000;  // delay antar aksi (ms)
+  let clicked = 0;
 
+  async function delay(ms) {
+    return new Promise(res => setTimeout(res, ms));
+  }
+
+  while (clicked < max) {
+    const button = await page.$(
+      'div[role="button"][aria-label*="Like"],div[role="button"][aria-label*="like"], div[role="button"][aria-label*="Suka"]'
+   );
+
+    if (button) {
+      await button.tap(); // ✅ simulate tap (touchscreen)
+      clicked++;
+      console.log(`👍 Klik tombol Like ke-${clicked}`);
+    } else {
+      console.log("🔄 Tidak ada tombol Like, scroll...");
+    }
+
+    // Scroll sedikit biar postingan baru muncul
+    await page.evaluate(() => window.scrollBy(0, 500));
+   await delay(delayMs);
+ }
+
+ console.log(`🎉 Selesai! ${clicked} tombol Like sudah diklik.`);
+  
     // ===== Stop recorder
     await recorder.stop();
     console.log("🎬 Rekaman selesai: recording.mp4");
